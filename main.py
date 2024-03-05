@@ -1,14 +1,27 @@
 import cv2
 import numpy as np
 import base64
-from flask import Flask, render_template
+import os
+from flask import Flask, render_template, request
+
 
 app = Flask(__name__)
-@app.route('/')
+app.config['UPLOAD_FOLDER'] = 'images/'
+
+
+@app.route('/', methods = ['GET', 'POST'])
 def exibir_imagem_processada():
-    caminho_da_imagem = 'images/imagem2.jpeg' # Especifique o caminho para a imagem
-    imagem_processada = processar_imagem(caminho_da_imagem)
+    if request.method == 'GET': # Imagem Default
+        imagem_processada = processar_imagem('images/imagem2.jpeg') # Especifique o caminho para a imagem
+    elif request.method == 'POST':
+        f = request.files['file']
+        caminho_img_temp = os.path.join(app.config['UPLOAD_FOLDER'], f.filename)
+        f.save(caminho_img_temp)
+        imagem_processada = processar_imagem(caminho_img_temp)
+        os.remove(caminho_img_temp)
     return render_template('index.html', imagem_processada=imagem_processada) # Processa a imagem
+
+
 def processar_imagem(caminho_da_imagem):
     def cut_middle_object(image_path):
         image = cv2.imread(image_path) # Carrega a Imagem
