@@ -1,12 +1,19 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-
-<head>
-    <meta charset="UTF-8">
-    <title>SISTEMA DE IDENTIFICAÇÃO DE FALHAS</title>
-</head>
-
-<body>
-    <img src="{{ imagem_processada }}" alt="Imagem Processada">
-</body>
+	<head>
+		<meta charset="UTF-8">
+		<title>SISTEMA DE IDENTIFICAÇÃO DE FALHAS</title>
+	</head>
+	<body>
+		<div style="text-align:center">
+			<br>
+			<h2>Insira imagem para indentificar falhas</h2>
+			<form action="http://localhost:5000/" method="POST" enctype="multipart/form-data">
+				<input type="file" name="file"/>
+				<input type="submit"/>
+			</form>
+			<br>
+			<img src="{{ imagem_processada }}" alt="Imagem Processada">
+		</div>
+	</body>
 </html>
