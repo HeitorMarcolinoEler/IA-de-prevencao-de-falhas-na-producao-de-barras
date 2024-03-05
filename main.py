@@ -45,7 +45,6 @@ def processar_imagem(caminho_da_imagem):
 
     retval, buffer = cv2.imencode('.png', image) # Converte a imagem processada para uma URL de dados
     imagem_processada_data_url = f'data:image/png;base64,{base64.b64encode(buffer).decode("utf-8")}'
-
     return imagem_processada_data_url # Retorna a imagem processada
 
 if __name__ == '__main__':
