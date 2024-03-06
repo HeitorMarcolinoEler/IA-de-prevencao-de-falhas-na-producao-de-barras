@@ -18,5 +18,6 @@ jobs:
           user: root
           pass: Falhas@#$
           run: |
-            ls -la
-            pwd
+            cd /root/IA-de-prevencao-de-falhas-na-producao-de-barras
+            git checkout master
+            git pull
