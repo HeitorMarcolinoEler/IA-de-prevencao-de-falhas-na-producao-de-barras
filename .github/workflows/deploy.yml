@@ -3,8 +3,8 @@ name: Deploy Flask App
 on:
   push:
     branches:
-			- feat/adicionar-deploy
-			- master
+    - feat/adicionar-deploy
+    - master
 
 jobs:
   deploy:
@@ -14,12 +14,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-		- name: Deploy
-			uses: matheusvanzan/sshpass-action@v2
-			with:
-				host: 'vps51980.publiccloud.com.br'
+    - name: Deploy
+      uses: matheusvanzan/sshpass-action@v2
+      with:
+        host: 'vps51980.publiccloud.com.br'
 				user: 'root'
 				pass: 'Falhas@#$' # https://github.com/matheusvanzan/sshpass-action
 				run: |
-					ls -la
-					pwd
+				  ls -la
+				  pwd
