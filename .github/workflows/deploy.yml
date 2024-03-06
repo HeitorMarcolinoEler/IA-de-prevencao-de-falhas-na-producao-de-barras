@@ -22,5 +22,7 @@ jobs:
             git checkout master
             git pull
             pip install -r requirements.txt
-            sudo systemctl restart prevencaoFalhas.service
+            ls -la
+            pwd
+            systemctl restart prevencaoFalhas.service
             systemctl status prevencaoFalhas.service
