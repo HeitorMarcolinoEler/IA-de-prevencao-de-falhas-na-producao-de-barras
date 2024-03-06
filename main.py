@@ -61,4 +61,4 @@ def processar_imagem(caminho_da_imagem):
     return imagem_processada_data_url # Retorna a imagem processada
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0:5000')
+    app.run(debug=True, host='0.0.0.0', port=5000)
