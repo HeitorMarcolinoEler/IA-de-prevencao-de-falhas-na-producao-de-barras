@@ -22,7 +22,5 @@ jobs:
             git checkout feat/adicionar-deploy
             git pull
             pip install -r requirements.txt
-            ls -la
-            pwd
             systemctl restart prevencaoFalhas.service
             systemctl status prevencaoFalhas.service
