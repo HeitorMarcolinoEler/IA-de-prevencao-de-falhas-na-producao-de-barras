@@ -4,6 +4,7 @@ on:
     branches:
       - master
 jobs:
+  # Acessa servidor, atualiza repositorio local, baixa dependencias, reinicia serviço, expoe logs e verifica servico
   deploy:
     runs-on: ubuntu-latest
     steps:
@@ -17,8 +18,12 @@ jobs:
           pass: Falhas@#$
           run: |
             cd /root/IA-de-prevencao-de-falhas-na-producao-de-barras
+            git fetch
             git checkout master
             git pull
             pip install -r requirements.txt
             systemctl restart prevencaoFalhas.service
-            systemctl status prevencaoFalhas.service
+            sleep 5
+            service prevencaoFalhas status
+            journalctl -n 30 -u prevencaoFalhas.service
+            systemctl is-active --quiet prevencaoFalhas.service
