@@ -18,8 +18,8 @@ jobs:
       uses: matheusvanzan/sshpass-action@v2
       with:
         host: 'vps51980.publiccloud.com.br'
-				user: 'root'
-				pass: 'Falhas@#$' # https://github.com/matheusvanzan/sshpass-action
-				run: |
-				  ls -la
-				  pwd
+	user: 'root'
+	pass: 'Falhas@#$' # https://github.com/matheusvanzan/sshpass-action
+	run: |
+	  ls -la
+	  pwd
