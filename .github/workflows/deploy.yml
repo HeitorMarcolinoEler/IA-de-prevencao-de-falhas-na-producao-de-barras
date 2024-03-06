@@ -21,3 +21,6 @@ jobs:
             cd /root/IA-de-prevencao-de-falhas-na-producao-de-barras
             git checkout master
             git pull
+            pip install -r requirements.txt
+            sudo systemctl restart prevencaoFalhas.service
+            systemctl status prevencaoFalhas.service
