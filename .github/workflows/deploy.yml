@@ -1,9 +1,7 @@
----
 name: Deploy Flask App
 on:
   push:
     branches:
-      - feat/adicionar-deploy
       - master
 jobs:
   deploy:
@@ -19,7 +17,7 @@ jobs:
           pass: Falhas@#$
           run: |
             cd /root/IA-de-prevencao-de-falhas-na-producao-de-barras
-            git checkout feat/adicionar-deploy
+            git checkout master
             git pull
             pip install -r requirements.txt
             systemctl restart prevencaoFalhas.service
