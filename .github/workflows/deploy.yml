@@ -1,0 +1,24 @@
+name: Deploy Flask App
+on:
+  push:
+    branches:
+      - master
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Deploy
+        uses: matheusvanzan/sshpass-action@v2
+        with:
+          host: vps51980.publiccloud.com.br
+          user: root
+          pass: Falhas@#$
+          run: |
+            cd /root/IA-de-prevencao-de-falhas-na-producao-de-barras
+            git checkout master
+            git pull
+            pip install -r requirements.txt
+            systemctl restart prevencaoFalhas.service
+            systemctl status prevencaoFalhas.service
