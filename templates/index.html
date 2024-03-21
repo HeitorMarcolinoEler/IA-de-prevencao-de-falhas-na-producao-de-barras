@@ -1,19 +1,30 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-	<head>
-		<meta charset="UTF-8">
-		<title>SISTEMA DE IDENTIFICAÇÃO DE FALHAS</title>
-	</head>
-	<body>
-		<div style="text-align:center">
-			<br>
-			<h2>Insira imagem para indentificar falhas</h2>
-			<form action="/" method="POST" enctype="multipart/form-data">
-				<input type="file" name="file"/>
-				<input type="submit"/>
-			</form>
-			<br>
-			<img src="{{ imagem_processada }}" alt="Imagem Processada">
-		</div>
-	</body>
+<head>
+    <meta charset="UTF-8">
+    <title>SISTEMA DE IDENTIFICAÇÃO DE FALHAS</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div style="text-align:center">
+    <br>
+    <h2>Insira imagem para identificar falhas</h2>
+    <form action="/" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file"/>
+        <input type="submit"/>
+    </form>
+</div>
+<div class="container">
+    <br>
+    <div>
+        <h2>Video Input</h2>
+        <img src="{{ imagem_original }}" alt="Imagem Original">
+    </div>
+    <div>
+        <h2>Video Output: {{ status }} = {{ porcentagem_falhas }}% de falhas</h2>
+        <img src="{{ imagem_delimitada }}" alt="Imagem Processada">
+    </div>
+</div>
+</body>
 </html>
