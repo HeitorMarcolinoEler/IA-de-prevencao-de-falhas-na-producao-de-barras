@@ -32,20 +32,30 @@ def menu_lateral(frame, mensagem, cor_texto, porcentagem_falhas, roi_falha=None,
     largura_menu = 300
     cor_fundo = (50, 50, 50)
     menu = np.full((altura, largura_menu, 3), cor_fundo, dtype=np.uint8)
-    cv2.putText(menu, mensagem, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_texto, 1)
-    cv2.putText(menu, f"Modelo: {modelo_atual}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    cv2.putText(menu, f"Falhas: {porcentagem_falhas:.2f}%", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    inicio_y = 120
+
+    margem_superior = 30
+    espaco_entre_textos = 30
+
+    cv2.putText(menu, mensagem, (10, margem_superior), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_texto, 1)
+    cv2.putText(menu, f"Modelo: {modelo_atual}", (10, margem_superior + espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    cv2.putText(menu, f"Falhas: {porcentagem_falhas:.2f}%", (10, margem_superior + 2*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+    inicio_y = margem_superior + 3*espaco_entre_textos + 20
     espaco_entre_imagens = 10
-    largura_imagem = (largura_menu - espaco_entre_imagens) // 2
+    largura_imagem = (largura_menu - 3*espaco_entre_imagens) // 2
     altura_imagem = 100
+
+    cv2.putText(menu, "Original", (10, inicio_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    cv2.putText(menu, "Processada", (largura_imagem + 2*espaco_entre_imagens, inicio_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
     if roi_falha is not None:
         roi_resized = cv2.resize(roi_falha, (largura_imagem, altura_imagem))
-        menu[inicio_y:inicio_y+altura_imagem, 0:largura_imagem] = roi_resized
+        menu[inicio_y:(inicio_y + altura_imagem), espaco_entre_imagens:(espaco_entre_imagens + largura_imagem)] = roi_resized
 
     if roi_falha_sobel is not None:
         roi_sobel_resized = cv2.resize(roi_falha_sobel, (largura_imagem, altura_imagem))
-        menu[inicio_y:inicio_y+altura_imagem, largura_imagem+espaco_entre_imagens:largura_menu] = roi_sobel_resized
+        menu[inicio_y:(inicio_y + altura_imagem), 2*espaco_entre_imagens + largura_imagem:(2*espaco_entre_imagens + 2*largura_imagem)] = roi_sobel_resized
+
     frame_com_menu = np.hstack((frame, menu))
     return frame_com_menu
 
@@ -83,7 +93,6 @@ else:
 
         frame_processado = process_frame(frame, pontos_roi)
         cv2.imshow('Scanner Qualidade', frame_processado)
-
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):  # Sair
             break
