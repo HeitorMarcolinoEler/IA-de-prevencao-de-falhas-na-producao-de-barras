@@ -6,6 +6,10 @@ status_barra = "AGUARDANDO"
 max_porcentagem_falhas = 0
 um_limiar_de_falhas = 40 # PORCENTAGEM DE FALHAS PARA IDENTIFICAR BARRA
 
+video_path = 'static/video_esteira.mp4'
+cap = cv2.VideoCapture(video_path)
+pontos_roi = [(210, 20), (250, 20), (250, 100), (210, 100)]
+
 def area_de_interesse(frame, pontos_roi):
     mask = np.zeros_like(frame)
     cv2.fillPoly(mask, [np.array(pontos_roi, np.int32)], (255, 255, 255))
@@ -78,10 +82,6 @@ def process_frame(frame, pontos_roi):
     frame[y:y+h, x:x+w] = roi_resized
     frame_com_menu = menu_lateral(frame, status, cor_status, porcentagem_falhas_atual, resultado, cor_resultado, roi_falha, roi_falha_sobel)
     return frame_com_menu
-
-video_path = 'static/video_esteira.mp4'
-cap = cv2.VideoCapture(video_path)
-pontos_roi = [(210, 20), (250, 20), (250, 100), (210, 100)]
 
 if not cap.isOpened():
     print("Erro ao abrir o vídeo.")
