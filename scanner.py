@@ -58,14 +58,18 @@ def process_frame(frame, pontos_roi):
     roi_falha = extrair_roi_corretamente(frame, pontos_roi)
     roi_falha_sobel = area_de_interesse(frame, pontos_roi)
     porcentagem_falhas_atual = np.mean(roi_falha_sobel) / 255 * 100
-    max_porcentagem_falhas = max(max_porcentagem_falhas, porcentagem_falhas_atual)
-    status = "AGUARDANDO..." if porcentagem_falhas_atual < um_limiar_de_falhas else "EM ANALISE"
+    status = "EM ANALISE" if porcentagem_falhas_atual < um_limiar_de_falhas else "AGUARDANDO..."
+
+    if status == "EM ANALISE":
+        max_porcentagem_falhas = max(max_porcentagem_falhas, porcentagem_falhas_atual)
+
     cor_status = (255, 255, 255)
+
     if max_porcentagem_falhas > 10:
         resultado = f"RECUSADO ({max_porcentagem_falhas:.2f}% de Falha)"
         cor_resultado = (0, 0, 255)
     else:
-        resultado = "APROVADO"
+        resultado = f"APROVADO ({max_porcentagem_falhas:.2f}% de Falha)"
         cor_resultado = (0, 255, 0)
 
     pts = np.array(pontos_roi, dtype=np.int32).reshape((-1, 1, 2))
