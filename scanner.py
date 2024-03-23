@@ -4,7 +4,8 @@ import numpy as np
 modelo_atual = 'Nenhum'
 status_barra = "AGUARDANDO"
 max_porcentagem_falhas = 0
-um_limiar_de_falhas = 40 # PORCENTAGEM DE FALHAS PARA IDENTIFICAR BARRA
+min_porcentagem_falhas = 100 # DECLARANDO RESULTADO MAXIMO POSSIVEL OPOSTO
+um_limiar_de_falhas = 38 # PORCENTAGEM DE FALHAS PARA IDENTIFICAR BARRA
 
 video_path = 'static/video_esteira.mp4'
 cap = cv2.VideoCapture(video_path)
@@ -58,17 +59,16 @@ def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_r
     return frame_com_menu
 
 def process_frame(frame, pontos_roi):
-    global status_barra, um_limiar_de_falhas, max_porcentagem_falhas, modelo_atual
+    global status_barra, um_limiar_de_falhas, max_porcentagem_falhas, min_porcentagem_falhas, modelo_atual
     roi_falha = extrair_roi_corretamente(frame, pontos_roi)
     roi_falha_sobel = area_de_interesse(frame, pontos_roi)
     porcentagem_falhas_atual = np.mean(roi_falha_sobel) / 255 * 100
     status = "EM ANALISE" if porcentagem_falhas_atual < um_limiar_de_falhas else "AGUARDANDO..."
+    cor_status = (255, 255, 255)
 
     if status == "EM ANALISE":
         max_porcentagem_falhas = max(max_porcentagem_falhas, porcentagem_falhas_atual)
-
-    cor_status = (255, 255, 255)
-
+        min_porcentagem_falhas = min(min_porcentagem_falhas, porcentagem_falhas_atual)
     if max_porcentagem_falhas > 10:
         resultado = f"RECUSADO ({max_porcentagem_falhas:.2f}% de Falha)"
         cor_resultado = (0, 0, 255)
@@ -83,9 +83,8 @@ def process_frame(frame, pontos_roi):
     frame_com_menu = menu_lateral(frame, status, cor_status, porcentagem_falhas_atual, resultado, cor_resultado, roi_falha, roi_falha_sobel)
     return frame_com_menu
 
-if not cap.isOpened():
-    print("Erro ao abrir o vídeo.")
-else:
+
+if cap.isOpened():
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -100,6 +99,9 @@ else:
             modelo_atual = 'Modelo 1'
         elif key == ord('2'):
             modelo_atual = 'Modelo 2'
+else:
+    print("Erro ao abrir o vídeo.")
+
 
 cap.release()
 cv2.destroyAllWindows()
