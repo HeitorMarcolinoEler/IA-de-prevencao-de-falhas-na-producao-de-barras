@@ -6,6 +6,23 @@ import pymongo
 # Constantes
 video_path = 'static/video_esteira.mp4'
 pontos_roi = [(210, 20), (250, 20), (250, 100), (210, 100)]
+max_porcentagem_falhas = 0
+min_porcentagem_falhas = 100
+um_limiar_de_falhas = 38
+
+
+# Função do Mongo a ser usado
+def db_append_object_status(max_porcentagem_falhas, min_porcentagem_falhas, avg_porcentagem_falhas=""):
+    myclient = pymongo.MongoClient("mongodb://mongouser:mongouser@vps51980.publiccloud.com.br:27017/")
+    db = myclient["db"]
+    colletion_rodape = db["objeto_rodape"]
+    rodape_specs = { "nome": "rodape1",
+            "max_porcentagem_falhas": max_porcentagem_falhas,
+            "min_porcentagem_falhas": min_porcentagem_falhas,
+            "med_porcentagem_falhas": avg_porcentagem_falhas,
+            "caminho_frame_processado": "images/qualquer.png" }
+    x = colletion_rodape.insert_one(rodape_specs)
+    return x.inserted_id
 
 
 def area_de_interesse(frame):
@@ -57,12 +74,13 @@ def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_r
     return frame_com_menu
 
 
+### Mexendo ainda
+# Essa função deverá armazenar os valores quando entrar "EM ANALISE" para extrair os dados relevantes depois;
+# deverá identificar o final do produto e depois fazer o insert dos dados relevantes no banco;
+# Ver forma de extrair imagem com falha no produto caso achar;
 def process_frame(frame, roi_falha, roi_falha_sobel):
+    global max_porcentagem_falhas, min_porcentagem_falhas, um_limiar_de_falhas
     cor_status=(255, 255, 255)
-    max_porcentagem_falhas = 0
-    min_porcentagem_falhas = 100 # DECLARANDO RESULTADO MAXIMO POSSIVEL OPOSTO
-    um_limiar_de_falhas = 38 # PORCENTAGEM DE FALHAS PARA IDENTIFICAR BARRA
-    status_barra = "AGUARDANDO"
     porcentagem_falhas_atual = np.mean(roi_falha_sobel) / 255 * 100
     status = "EM ANALISE" if porcentagem_falhas_atual < um_limiar_de_falhas else "AGUARDANDO..."
     if status == "EM ANALISE":
@@ -86,9 +104,13 @@ def main():
     cap = cv2.VideoCapture(video_path)
     while cap.isOpened():
         ret, frame = cap.read()
-        if not ret:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            continue
+        if not ret: # Quando acabar o video, reiniciar (apertando R) ou fechar depois de 7 segundos.
+            key = cv2.waitKey(7000) & 0xFF
+            if key == ord('r'):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                continue
+            else:
+                break
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):  # Sair
             break
