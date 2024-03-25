@@ -1,29 +1,45 @@
 import cv2
 import numpy as np
 import pymongo
+from pymongo.errors import ConnectionFailure
 
-
-# Constantes
 video_path = 'static/video_esteira.mp4'
 pontos_roi = [(210, 20), (250, 20), (250, 100), (210, 100)]
 max_porcentagem_falhas = 0
 min_porcentagem_falhas = 100
 um_limiar_de_falhas = 38
 
-
-# Função do Mongo a ser usado
 def db_append_object_status(max_porcentagem_falhas, min_porcentagem_falhas, avg_porcentagem_falhas=""):
-    myclient = pymongo.MongoClient("mongodb://mongouser:mongouser@vps51980.publiccloud.com.br:27017/")
-    db = myclient["db"]
-    colletion_rodape = db["objeto_rodape"]
-    rodape_specs = { "nome": "rodape1",
+    try:
+        # Base 'Produção':
+        #myclient = pymongo.MongoClient("mongodb://mongouser:mongouser@vps51980.publiccloud.com.br:27017/", serverSelectionTimeoutMS=5000)
+        # Base Local:
+        myclient = pymongo.MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=5000)
+        myclient.admin.command('ping')
+        print("Conectado com sucesso ao MongoDB.")
+
+        db = myclient["db_esteira"]
+        collection_rodape = db["objeto_rodape"]
+        rodape_specs = {
+            "nome": "rodape1",
             "max_porcentagem_falhas": max_porcentagem_falhas,
             "min_porcentagem_falhas": min_porcentagem_falhas,
             "med_porcentagem_falhas": avg_porcentagem_falhas,
-            "caminho_frame_processado": "images/qualquer.png" }
-    x = colletion_rodape.insert_one(rodape_specs)
-    return x.inserted_id
+            "caminho_frame_processado": "images/qualquer.png"
+        }
+        x = collection_rodape.insert_one(rodape_specs)
+        return x.inserted_id
+    except ConnectionFailure as e:
+        print(f"Não foi possível conectar ao MongoDB: {e}")
+    except Exception as e:
+        print(f"Ocorreu um erro ao acessar o MongoDB: {e}")
 
+if __name__ == "__main__":
+    result = db_append_object_status(10, 5, 7.5)
+    if result:
+        print(f"Documento inserido com sucesso. ID: {result}")
+    else:
+        print("Documento não foi inserido.")
 
 def area_de_interesse(frame):
     mask = np.zeros_like(frame)
@@ -36,7 +52,6 @@ def area_de_interesse(frame):
     sobel_bgr = cv2.cvtColor(cv2.convertScaleAbs(sobel), cv2.COLOR_GRAY2BGR)
     return sobel_bgr
 
-
 def extrair_roi_corretamente(frame):
     pts = np.array(pontos_roi, dtype=np.int32)
     pts = pts.reshape((-1, 1, 2))
@@ -46,7 +61,6 @@ def extrair_roi_corretamente(frame):
     x, y, w, h = cv2.boundingRect(pts)
     roi_cortada = masked[y:y+h, x:x+w]
     return roi_cortada
-
 
 def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_resultado, roi_falha=None, roi_falha_sobel=None):
     altura, largura = frame.shape[:2]
@@ -73,7 +87,6 @@ def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_r
     frame_com_menu = np.hstack((frame, menu))
     return frame_com_menu
 
-
 ### Mexendo ainda
 # Essa função deverá armazenar os valores quando entrar "EM ANALISE" para extrair os dados relevantes depois;
 # deverá identificar o final do produto e depois fazer o insert dos dados relevantes no banco;
@@ -99,7 +112,6 @@ def process_frame(frame, roi_falha, roi_falha_sobel):
     frame_com_menu = menu_lateral(frame, status, cor_status, porcentagem_falhas_atual, resultado, cor_resultado, roi_falha, roi_falha_sobel)
     return frame_com_menu
 
-
 def main():
     cap = cv2.VideoCapture(video_path)
     while cap.isOpened():
@@ -120,6 +132,5 @@ def main():
         cv2.imshow('Scanner Qualidade', frame_processado)
     cap.release()
     cv2.destroyAllWindows()
-
 
 main()
