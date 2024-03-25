@@ -1,20 +1,34 @@
 import cv2
 import numpy as np
+import pymongo
 
-modelo_atual = 'Nenhum'
-status_barra = "AGUARDANDO"
-max_porcentagem_falhas = 0
-min_porcentagem_falhas = 100 # DECLARANDO RESULTADO MAXIMO POSSIVEL OPOSTO
-um_limiar_de_falhas = 38 # PORCENTAGEM DE FALHAS PARA IDENTIFICAR BARRA
 
+# Constantes
 video_path = 'static/video_esteira.mp4'
-cap = cv2.VideoCapture(video_path)
 pontos_roi = [(210, 20), (250, 20), (250, 100), (210, 100)]
+max_porcentagem_falhas = 0
+min_porcentagem_falhas = 100
+um_limiar_de_falhas = 38
 
-def area_de_interesse(frame, pontos_roi):
+
+# Função do Mongo a ser usado
+def db_append_object_status(max_porcentagem_falhas, min_porcentagem_falhas, avg_porcentagem_falhas=""):
+    myclient = pymongo.MongoClient("mongodb://mongouser:mongouser@vps51980.publiccloud.com.br:27017/")
+    db = myclient["db"]
+    colletion_rodape = db["objeto_rodape"]
+    rodape_specs = { "nome": "rodape1",
+            "max_porcentagem_falhas": max_porcentagem_falhas,
+            "min_porcentagem_falhas": min_porcentagem_falhas,
+            "med_porcentagem_falhas": avg_porcentagem_falhas,
+            "caminho_frame_processado": "images/qualquer.png" }
+    x = colletion_rodape.insert_one(rodape_specs)
+    return x.inserted_id
+
+
+def area_de_interesse(frame):
     mask = np.zeros_like(frame)
     cv2.fillPoly(mask, [np.array(pontos_roi, np.int32)], (255, 255, 255))
-    roi = extrair_roi_corretamente(frame, pontos_roi)
+    roi = extrair_roi_corretamente(frame)
     gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
     sobelx = cv2.Sobel(gray_roi, cv2.CV_64F, 1, 0, ksize=5)
     sobely = cv2.Sobel(gray_roi, cv2.CV_64F, 0, 1, ksize=5)
@@ -22,7 +36,8 @@ def area_de_interesse(frame, pontos_roi):
     sobel_bgr = cv2.cvtColor(cv2.convertScaleAbs(sobel), cv2.COLOR_GRAY2BGR)
     return sobel_bgr
 
-def extrair_roi_corretamente(frame, pontos_roi):
+
+def extrair_roi_corretamente(frame):
     pts = np.array(pontos_roi, dtype=np.int32)
     pts = pts.reshape((-1, 1, 2))
     mask = np.zeros(frame.shape[:2], dtype=np.uint8)
@@ -32,8 +47,8 @@ def extrair_roi_corretamente(frame, pontos_roi):
     roi_cortada = masked[y:y+h, x:x+w]
     return roi_cortada
 
+
 def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_resultado, roi_falha=None, roi_falha_sobel=None):
-    global modelo_atual
     altura, largura = frame.shape[:2]
     largura_menu = 300
     cor_fundo = (50, 50, 50)
@@ -58,14 +73,16 @@ def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_r
     frame_com_menu = np.hstack((frame, menu))
     return frame_com_menu
 
-def process_frame(frame, pontos_roi):
-    global status_barra, um_limiar_de_falhas, max_porcentagem_falhas, min_porcentagem_falhas, modelo_atual
-    roi_falha = extrair_roi_corretamente(frame, pontos_roi)
-    roi_falha_sobel = area_de_interesse(frame, pontos_roi)
+
+### Mexendo ainda
+# Essa função deverá armazenar os valores quando entrar "EM ANALISE" para extrair os dados relevantes depois;
+# deverá identificar o final do produto e depois fazer o insert dos dados relevantes no banco;
+# Ver forma de extrair imagem com falha no produto caso achar;
+def process_frame(frame, roi_falha, roi_falha_sobel):
+    global max_porcentagem_falhas, min_porcentagem_falhas, um_limiar_de_falhas
+    cor_status=(255, 255, 255)
     porcentagem_falhas_atual = np.mean(roi_falha_sobel) / 255 * 100
     status = "EM ANALISE" if porcentagem_falhas_atual < um_limiar_de_falhas else "AGUARDANDO..."
-    cor_status = (255, 255, 255)
-
     if status == "EM ANALISE":
         max_porcentagem_falhas = max(max_porcentagem_falhas, porcentagem_falhas_atual)
         min_porcentagem_falhas = min(min_porcentagem_falhas, porcentagem_falhas_atual)
@@ -75,7 +92,6 @@ def process_frame(frame, pontos_roi):
     else:
         resultado = f"APROVADO ({max_porcentagem_falhas:.2f}% de Falha)"
         cor_resultado = (0, 255, 0)
-
     pts = np.array(pontos_roi, dtype=np.int32).reshape((-1, 1, 2))
     x, y, w, h = cv2.boundingRect(pts)
     roi_resized = cv2.resize(roi_falha_sobel, (w, h))
@@ -84,24 +100,26 @@ def process_frame(frame, pontos_roi):
     return frame_com_menu
 
 
-if cap.isOpened():
-    while True:
+def main():
+    cap = cv2.VideoCapture(video_path)
+    while cap.isOpened():
         ret, frame = cap.read()
-        if not ret:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            continue
-        frame_processado = process_frame(frame, pontos_roi)
-        cv2.imshow('Scanner Qualidade', frame_processado)
+        if not ret: # Quando acabar o video, reiniciar (apertando R) ou fechar depois de 7 segundos.
+            key = cv2.waitKey(7000) & 0xFF
+            if key == ord('r'):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                continue
+            else:
+                break
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):  # Sair
             break
-        elif key == ord('1'):
-            modelo_atual = 'Modelo 1'
-        elif key == ord('2'):
-            modelo_atual = 'Modelo 2'
-else:
-    print("Erro ao abrir o vídeo.")
+        roi_falha = extrair_roi_corretamente(frame)
+        roi_falha_sobel = area_de_interesse(frame)
+        frame_processado = process_frame(frame, roi_falha, roi_falha_sobel)
+        cv2.imshow('Scanner Qualidade', frame_processado)
+    cap.release()
+    cv2.destroyAllWindows()
 
 
-cap.release()
-cv2.destroyAllWindows()
+main()
