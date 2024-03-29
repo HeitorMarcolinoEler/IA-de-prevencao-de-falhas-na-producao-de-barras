@@ -5,8 +5,8 @@ from pymongo.errors import ConnectionFailure
 import threading
 import time
 
-video_path = 'static/video_esteira.mp4'
-pontos_roi = [(210, 20), (250, 20), (250, 100), (210, 100)]
+video_path = 'static/video_esteira3.mp4'
+pontos_roi = [(210, 40), (250, 40), (250, 440), (210, 440)]
 frames_processados = []
 max_porcentagem_falhas = 0
 min_porcentagem_falhas = 100
@@ -124,6 +124,7 @@ def analise_de_frames(frames_processados_final):
 def main():
     cap = cv2.VideoCapture(video_path)
     while cap.isOpened():
+        # time.sleep(0.1) # delay pra debugar
         ret, frame = cap.read()
         if not ret: # Quando acabar o video, reiniciar (apertando R) ou fechar depois de 7 segundos.
             key = cv2.waitKey(7000) & 0xFF
@@ -140,9 +141,9 @@ def main():
         frame_processado, frames_processados_final = process_frame(frame, roi_falha, roi_falha_sobel)
         if len(frames_processados_final) != 0:
             mini, maxi, avg = analise_de_frames(frames_processados_final)
-            # x = threading.Thread(target=db_append_object_status, args=(mini, maxi, avg)) # Cria processo
-            # x.start() # começa
-            db_append_object_status(mini, maxi, avg) # Processo unico sincrono
+            x = threading.Thread(target=db_append_object_status, args=(mini, maxi, avg)) # Cria processo
+            x.start() # começa
+            # db_append_object_status(mini, maxi, avg) # Processo unico sincrono
             print(f"Final com {len(frames_processados_final)} frames processados, maximo {maxi} minimo {mini} media {avg}")
         cv2.imshow('Scanner Qualidade', frame_processado)
     cap.release()
