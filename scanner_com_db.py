@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import pymongo
 from pymongo.errors import ConnectionFailure
+import threading
+import time
 
 video_path = 'static/video_esteira.mp4'
 pontos_roi = [(210, 20), (250, 20), (250, 100), (210, 100)]
@@ -12,6 +14,7 @@ um_limiar_de_falhas = 38
 
 
 def db_append_object_status(min_porcentagem_falhas, max_porcentagem_falhas, avg_porcentagem_falhas):
+    t = time.process_time()
     try:
         # Base 'Produção':
         myclient = pymongo.MongoClient("mongodb://mongouser:mongouser@vps51980.publiccloud.com.br:27017/", serverSelectionTimeoutMS=5000)
@@ -28,6 +31,8 @@ def db_append_object_status(min_porcentagem_falhas, max_porcentagem_falhas, avg_
             "caminho_frame_processado": "images/qualquer.png"
         }
         x = collection_rodape.insert_one(rodape_specs)
+        tempo = time.process_time() - t
+        print(f"FEITO INSERT EM {tempo:.3f}ms")
         return x.inserted_id
     except ConnectionFailure as e:
         print(f"Não foi possível conectar ao MongoDB: {e}")
@@ -113,7 +118,7 @@ def analise_de_frames(frames_processados_final):
     mini = min(frames_processados_final)
     maxi = max(frames_processados_final)
     avg = sum(frames_processados_final) / len(frames_processados_final)
-    return f"{mini:.2f}", f"{maxi:.2f}", f"{avg:.2f}"
+    return f"{mini:.2f}%", f"{maxi:.2f}%", f"{avg:.2f}%"
 
 
 def main():
@@ -135,7 +140,9 @@ def main():
         frame_processado, frames_processados_final = process_frame(frame, roi_falha, roi_falha_sobel)
         if len(frames_processados_final) != 0:
             mini, maxi, avg = analise_de_frames(frames_processados_final)
-            db_append_object_status(mini, maxi, avg)
+            # x = threading.Thread(target=db_append_object_status, args=(mini, maxi, avg)) # Cria processo
+            # x.start() # começa
+            db_append_object_status(mini, maxi, avg) # Processo unico sincrono
             print(f"Final com {len(frames_processados_final)} frames processados, maximo {maxi} minimo {mini} media {avg}")
         cv2.imshow('Scanner Qualidade', frame_processado)
     cap.release()
