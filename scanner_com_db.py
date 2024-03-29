@@ -5,19 +5,19 @@ from pymongo.errors import ConnectionFailure
 
 video_path = 'static/video_esteira.mp4'
 pontos_roi = [(210, 20), (250, 20), (250, 100), (210, 100)]
+frames_processados = []
 max_porcentagem_falhas = 0
 min_porcentagem_falhas = 100
 um_limiar_de_falhas = 38
 
-def db_append_object_status(max_porcentagem_falhas, min_porcentagem_falhas, avg_porcentagem_falhas=""):
+
+def db_append_object_status(min_porcentagem_falhas, max_porcentagem_falhas, avg_porcentagem_falhas):
     try:
         # Base 'Produção':
-        #myclient = pymongo.MongoClient("mongodb://mongouser:mongouser@vps51980.publiccloud.com.br:27017/", serverSelectionTimeoutMS=5000)
+        myclient = pymongo.MongoClient("mongodb://mongouser:mongouser@vps51980.publiccloud.com.br:27017/", serverSelectionTimeoutMS=5000)
         # Base Local:
-        myclient = pymongo.MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=5000)
-        myclient.admin.command('ping')
-        print("Conectado com sucesso ao MongoDB.")
-
+        # myclient = pymongo.MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=5000)
+        
         db = myclient["db_esteira"]
         collection_rodape = db["objeto_rodape"]
         rodape_specs = {
@@ -34,12 +34,15 @@ def db_append_object_status(max_porcentagem_falhas, min_porcentagem_falhas, avg_
     except Exception as e:
         print(f"Ocorreu um erro ao acessar o MongoDB: {e}")
 
-if __name__ == "__main__":
-    result = db_append_object_status(10, 5, 7.5)
-    if result:
-        print(f"Documento inserido com sucesso. ID: {result}")
-    else:
-        print("Documento não foi inserido.")
+def extrair_roi_corretamente(frame):
+    pts = np.array(pontos_roi, dtype=np.int32)
+    pts = pts.reshape((-1, 1, 2))
+    mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(mask, [pts], 255)
+    masked = cv2.bitwise_and(frame, frame, mask=mask)
+    x, y, w, h = cv2.boundingRect(pts)
+    roi_cortada = masked[y:y+h, x:x+w]
+    return roi_cortada
 
 def area_de_interesse(frame):
     mask = np.zeros_like(frame)
@@ -51,16 +54,6 @@ def area_de_interesse(frame):
     sobel = cv2.magnitude(sobelx, sobely)
     sobel_bgr = cv2.cvtColor(cv2.convertScaleAbs(sobel), cv2.COLOR_GRAY2BGR)
     return sobel_bgr
-
-def extrair_roi_corretamente(frame):
-    pts = np.array(pontos_roi, dtype=np.int32)
-    pts = pts.reshape((-1, 1, 2))
-    mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(mask, [pts], 255)
-    masked = cv2.bitwise_and(frame, frame, mask=mask)
-    x, y, w, h = cv2.boundingRect(pts)
-    roi_cortada = masked[y:y+h, x:x+w]
-    return roi_cortada
 
 def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_resultado, roi_falha=None, roi_falha_sobel=None):
     altura, largura = frame.shape[:2]
@@ -87,18 +80,22 @@ def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_r
     frame_com_menu = np.hstack((frame, menu))
     return frame_com_menu
 
-### Mexendo ainda
-# Essa função deverá armazenar os valores quando entrar "EM ANALISE" para extrair os dados relevantes depois;
-# deverá identificar o final do produto e depois fazer o insert dos dados relevantes no banco;
-# Ver forma de extrair imagem com falha no produto caso achar;
 def process_frame(frame, roi_falha, roi_falha_sobel):
-    global max_porcentagem_falhas, min_porcentagem_falhas, um_limiar_de_falhas
+    global max_porcentagem_falhas, min_porcentagem_falhas, um_limiar_de_falhas, frames_processados
     cor_status=(255, 255, 255)
+    frames_processados_final = []
     porcentagem_falhas_atual = np.mean(roi_falha_sobel) / 255 * 100
     status = "EM ANALISE" if porcentagem_falhas_atual < um_limiar_de_falhas else "AGUARDANDO..."
     if status == "EM ANALISE":
+        frames_processados.append(porcentagem_falhas_atual)
         max_porcentagem_falhas = max(max_porcentagem_falhas, porcentagem_falhas_atual)
         min_porcentagem_falhas = min(min_porcentagem_falhas, porcentagem_falhas_atual)
+    else:
+        if len(frames_processados) != 0:
+            frames_processados_final = frames_processados # Guarda todos os frames processados
+            frames_processados = []
+        else:
+            frames_processados = []
     if max_porcentagem_falhas > 10:
         resultado = f"RECUSADO ({max_porcentagem_falhas:.2f}% de Falha)"
         cor_resultado = (0, 0, 255)
@@ -110,7 +107,14 @@ def process_frame(frame, roi_falha, roi_falha_sobel):
     roi_resized = cv2.resize(roi_falha_sobel, (w, h))
     frame[y:y+h, x:x+w] = roi_resized
     frame_com_menu = menu_lateral(frame, status, cor_status, porcentagem_falhas_atual, resultado, cor_resultado, roi_falha, roi_falha_sobel)
-    return frame_com_menu
+    return frame_com_menu, frames_processados_final
+
+def analise_de_frames(frames_processados_final):
+    mini = min(frames_processados_final)
+    maxi = max(frames_processados_final)
+    avg = sum(frames_processados_final) / len(frames_processados_final)
+    return f"{mini:.2f}", f"{maxi:.2f}", f"{avg:.2f}"
+
 
 def main():
     cap = cv2.VideoCapture(video_path)
@@ -128,9 +132,14 @@ def main():
             break
         roi_falha = extrair_roi_corretamente(frame)
         roi_falha_sobel = area_de_interesse(frame)
-        frame_processado = process_frame(frame, roi_falha, roi_falha_sobel)
+        frame_processado, frames_processados_final = process_frame(frame, roi_falha, roi_falha_sobel)
+        if len(frames_processados_final) != 0:
+            mini, maxi, avg = analise_de_frames(frames_processados_final)
+            db_append_object_status(mini, maxi, avg)
+            print(f"Final com {len(frames_processados_final)} frames processados, maximo {maxi} minimo {mini} media {avg}")
         cv2.imshow('Scanner Qualidade', frame_processado)
     cap.release()
     cv2.destroyAllWindows()
+
 
 main()
