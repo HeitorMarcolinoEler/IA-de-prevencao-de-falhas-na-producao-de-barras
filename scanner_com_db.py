@@ -6,7 +6,7 @@ import threading
 import time
 
 video_path = 'static/video_esteira3.mp4'
-pontos_roi = [(210, 40), (250, 40), (250, 440), (210, 440)]
+pontos_roi = [(660, 10), (350, 10), (350, 475), (660, 475)]
 frames_processados = []
 max_porcentagem_falhas = 0
 min_porcentagem_falhas = 100
@@ -40,6 +40,8 @@ def db_append_object_status(min_porcentagem_falhas, max_porcentagem_falhas, avg_
         print(f"Ocorreu um erro ao acessar o MongoDB: {e}")
 
 def extrair_roi_corretamente(frame):
+    # interessante recortar pois em alguns pontos da filmagem pode ter pouca ou muita iluminação
+    # assim influenciando no resultado
     pts = np.array(pontos_roi, dtype=np.int32)
     pts = pts.reshape((-1, 1, 2))
     mask = np.zeros(frame.shape[:2], dtype=np.uint8)
@@ -84,6 +86,24 @@ def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_r
         menu[inicio_y:(inicio_y + altura_imagem), 2*espaco_entre_imagens + largura_imagem:(2*espaco_entre_imagens + 2*largura_imagem)] = roi_sobel_resized
     frame_com_menu = np.hstack((frame, menu))
     return frame_com_menu
+
+def contornos(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    largest_area = 12000  # Tamanho maximo da area
+    largest_rect = None  # Armazena a maior area do momento
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area > largest_area:
+            largest_area = area
+            x, y, w, h = cv2.boundingRect(contour)
+            largest_rect = (x, y, w, h)
+    if largest_rect is not None: # Se uma area maior for encontrada, atualiza
+        x, y, w, h = largest_rect
+        return True, frame[y:y+h, x:x+w] # Retorna frame cortado na area identificada
+    else:
+        return False, frame # Retorna frame Default (nao foi encontrado contorno)
 
 def process_frame(frame, roi_falha, roi_falha_sobel):
     global max_porcentagem_falhas, min_porcentagem_falhas, um_limiar_de_falhas, frames_processados
