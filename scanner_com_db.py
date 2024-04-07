@@ -87,24 +87,6 @@ def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_r
     frame_com_menu = np.hstack((frame, menu))
     return frame_com_menu
 
-def contornos(frame):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    largest_area = 12000  # Tamanho maximo da area
-    largest_rect = None  # Armazena a maior area do momento
-    for contour in contours:
-        area = cv2.contourArea(contour)
-        if area > largest_area:
-            largest_area = area
-            x, y, w, h = cv2.boundingRect(contour)
-            largest_rect = (x, y, w, h)
-    if largest_rect is not None: # Se uma area maior for encontrada, atualiza
-        x, y, w, h = largest_rect
-        return True, frame[y:y+h, x:x+w] # Retorna frame cortado na area identificada
-    else:
-        return False, frame # Retorna frame Default (nao foi encontrado contorno)
-
 def process_frame(frame, roi_falha, roi_falha_sobel):
     global max_porcentagem_falhas, min_porcentagem_falhas, um_limiar_de_falhas, frames_processados
     cor_status=(255, 255, 255)
@@ -144,7 +126,7 @@ def analise_de_frames(frames_processados_final):
 def main():
     cap = cv2.VideoCapture(video_path)
     while cap.isOpened():
-        # time.sleep(0.1) # delay pra debugar
+        time.sleep(0.05) # delay pra debugar
         ret, frame = cap.read()
         if not ret: # Quando acabar o video, reiniciar (apertando R) ou fechar depois de 7 segundos.
             key = cv2.waitKey(7000) & 0xFF
