@@ -5,6 +5,8 @@ import time
 video_path = 'static/video_esteira3.mp4'
 cap = cv2.VideoCapture(video_path)
 pontos_roi = [(660, 10), (350, 10), (350, 475), (660, 475)]
+frames_processados = []
+resultado = ''
 
 def extrair_roi_corretamente(frame):
     pts = np.array(pontos_roi, dtype=np.int32)
@@ -34,24 +36,45 @@ def contornos(frame):
         return False, None
 
 def process_frame(frame):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                   cv2.THRESH_BINARY_INV, 11, 2)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(frame, contours, -1, (0, 255, 0), 1)
-    return frame
-
-def area_de_interesse(frame):
     mask = np.zeros_like(frame)
     cv2.fillPoly(mask, [np.array(pontos_roi, np.int32)], (255, 255, 255))
-    roi = extrair_roi_corretamente(frame)
-    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    gray_roi = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     sobelx = cv2.Sobel(gray_roi, cv2.CV_64F, 1, 0, ksize=5)
     sobely = cv2.Sobel(gray_roi, cv2.CV_64F, 0, 1, ksize=5)
     sobel = cv2.magnitude(sobelx, sobely)
     sobel_bgr = cv2.cvtColor(cv2.convertScaleAbs(sobel), cv2.COLOR_GRAY2BGR)
     return sobel_bgr
+
+def pontuacoes(processed_roi_contour):
+    porcentagem_falhas_atual = np.mean(processed_roi_contour) / 255 * 100
+    frames_processados.append(porcentagem_falhas_atual)
+    return porcentagem_falhas_atual
+
+def analise_de_frames(frames_processados_final):
+    mini = min(frames_processados_final)
+    maxi = max(frames_processados_final)
+    avg = sum(frames_processados_final) / len(frames_processados_final)
+    return f"{mini:.2f}%", f"{avg:.2f}%", f"{maxi:.2f}%"
+
+
+def menu_lateral(frame, status, porcentagem_falhas_atual, resultado):
+    cor_status=(255, 255, 255) if status=="OCIOSO" else (0, 255, 0)
+    altura, largura = frame.shape[:2]
+    largura_menu = 300
+    cor_fundo = (50, 50, 50)
+    menu = np.full((altura, largura_menu, 3), cor_fundo, dtype=np.uint8)
+    margem_superior = 30
+    espaco_entre_textos = 30
+    cv2.putText(menu, f"Status: {status}", (10, margem_superior), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_status, 1)
+    cv2.putText(menu, f"Falhas: {porcentagem_falhas_atual:.2f}%", (10, margem_superior + espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    # cor_resultado=(255, 255, 255) if status=="OCIOSO" else (0, 255, 0)
+    cor_resultado=(255, 255, 255)
+    cv2.putText(menu, str(resultado), (10, margem_superior + 2*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_resultado, 1)
+    inicio_y = margem_superior + 3*espaco_entre_textos + 20
+    frame_com_menu = np.hstack((frame, menu))
+    return frame_com_menu
+
+
 
 while True:
     ret, frame = cap.read()
@@ -61,14 +84,22 @@ while True:
     roi, (rx, ry, rw, rh) = extrair_roi_corretamente(frame)  # Extract ROI and its position
     success, largest_rect = contornos(roi)  # Find the largest contour in the ROI
     if success:
+        resultado = 'Processando...'
+        status = "EM ANALISE"
         x, y, w, h = largest_rect
         roi_contour = roi[y:y+h, x:x+w]
-        # roi_contour = area_de_interesse(roi_contour)
         processed_roi_contour = process_frame(roi_contour)
+        porcentagem_falhas_atual = pontuacoes(processed_roi_contour) # Coleta pontuação do frame
         roi[y:y+h, x:x+w] = processed_roi_contour
         frame[ry:ry+rh, rx:rx+rw] = roi
-        # cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 255, 255), 2)
-    cv2.imshow('Frame', frame)
+    elif len(frames_processados) > 0: # fechamento de frames analisados
+        status = "FECHANDO..."
+        resultado = analise_de_frames(frames_processados)
+        frames_processados = []
+    else:
+        status = "OCIOSO"
+    frame_com_menu = menu_lateral(frame, status, porcentagem_falhas_atual, resultado)
+    cv2.imshow('Frame', frame_com_menu)
     if cv2.waitKey(25) & 0xFF == ord('q'):
         break
 

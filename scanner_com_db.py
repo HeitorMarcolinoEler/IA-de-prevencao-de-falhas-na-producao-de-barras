@@ -78,10 +78,10 @@ def menu_lateral(frame, status, cor_status, porcentagem_falhas, resultado, cor_r
     altura_imagem = 100
     cv2.putText(menu, "Original", (10, inicio_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
     cv2.putText(menu, "Processada", (largura_imagem + 2*espaco_entre_imagens, inicio_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    if roi_falha is not None:
+    if roi_falha is not None: # Faz telinha
         roi_resized = cv2.resize(roi_falha, (largura_imagem, altura_imagem))
         menu[inicio_y:(inicio_y + altura_imagem), espaco_entre_imagens:(espaco_entre_imagens + largura_imagem)] = roi_resized
-    if roi_falha_sobel is not None:
+    if roi_falha_sobel is not None: # Faz telinha
         roi_sobel_resized = cv2.resize(roi_falha_sobel, (largura_imagem, altura_imagem))
         menu[inicio_y:(inicio_y + altura_imagem), 2*espaco_entre_imagens + largura_imagem:(2*espaco_entre_imagens + 2*largura_imagem)] = roi_sobel_resized
     frame_com_menu = np.hstack((frame, menu))
