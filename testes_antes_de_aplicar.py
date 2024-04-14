@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 import time
 
-# video_path = 'static/video_esteira2_editado.mp4'
+video_path = 'static/video_esteira2_editado.mp4'
 # video_path = 'static/video_esteira2.mp4'
-video_path = 'static/video_esteira3.mp4'
+# video_path = 'static/video_esteira3.mp4'
 cap = cv2.VideoCapture(video_path)
 pontos_roi = [(660, 10), (350, 10), (350, 475), (660, 475)]
 threshold_media_resultado = 11
@@ -56,7 +56,6 @@ def pontuacoes(processed_roi_contour):
 def find_high_deviant_sequences(data, num_std_dev=1.2):
     # funcao para identificar sequencias de porcentagem mais altas que a media
     # identifica pontos de anormalidade durante o scanner
-    # desenvolver funcao para exportar o video onde foi localizado a sequencia
     mean = sum(data) / len(data)
     std_dev = (sum((x - mean) ** 2 for x in data) / len(data)) ** 0.5
     upper_bound = mean + num_std_dev * std_dev
@@ -73,19 +72,37 @@ def find_high_deviant_sequences(data, num_std_dev=1.2):
         high_deviant_sequences.append(current_sequence)
     return high_deviant_sequences
 
+def find_subsequence_indexes(lista_geral, lista_anormalidade): # encontra sequencia com porcentagem anormal dentro da analise geral
+    for i in range(len(lista_geral) - len(lista_anormalidade) + 1):
+        if lista_geral[i:i+len(lista_anormalidade)] == lista_anormalidade:
+            return i, i+len(lista_anormalidade)-1
+    return -1, -1
+
 def analise_de_frames(frames_processados_final):
+    lista_pontuacao_anormal = find_high_deviant_sequences(frames_processados_final, num_std_dev=1.2)
+    sequencia_anormal = 'OK'
+    for pontuacao_anormal in lista_pontuacao_anormal:
+        if pontuacao_anormal == frames_processados_final[:len(pontuacao_anormal)]:
+            frames_processados_final = frames_processados_final[len(pontuacao_anormal):] # remove falso positivo começo
+        elif pontuacao_anormal == frames_processados_final[-len(pontuacao_anormal):]:
+            frames_processados_final = frames_processados_final[:len(frames_processados_final)-len(pontuacao_anormal)] # remove falso positivo final
+        if len(pontuacao_anormal) > 2: # pega sequencias de anormalidade
+            sequencia_anormal = find_subsequence_indexes(frames_processados_final, pontuacao_anormal)
     mini = min(frames_processados_final)
     maxi = max(frames_processados_final)
     avg = sum(frames_processados_final) / len(frames_processados_final)
-    lista_pontuacao_anormal = find_high_deviant_sequences(frames_processados_final, num_std_dev=1.2)
-    sequencia_anormal = 0
-    for i in lista_pontuacao_anormal:
-        if len(i) > 2 and len(i) > sequencia_anormal:
-            sequencia_anormal = len(i)
-            print(str(i))
-    return f"{mini:.2f}%", f"{avg:.2f}%", f"{maxi:.2f}%", sequencia_anormal
+    return f"{mini:.2f}%", f"{avg:.2f}%", f"{maxi:.2f}%", len(frames_processados_final), sequencia_anormal
 
-def menu_lateral(frame, status, porcentagem_falhas_atual, resultados):
+def escolhe_cor_resultado(resultado):
+    if resultado[4] != 'OK' and float(resultado[1][:-1])>threshold_media_resultado: # possui sequencia e porcentagem maior que threshold
+        cor_resultado = (0, 0, 255) # Vermelho
+    elif resultado[4] != 'OK': # possui sequencia
+        cor_resultado = (0, 255, 255) # Amarelo
+    else: # Tudo ok
+        cor_resultado = (0, 255, 0) # Verde
+    return cor_resultado
+
+def menu_lateral(frame, status, porcentagem_falhas_atual, resultados, cor_resultado):
     cor_status=(255, 255, 255) if status=="OCIOSO" else (0, 255, 255)
     altura, largura = frame.shape[:2]
     largura_menu = 300
@@ -95,18 +112,18 @@ def menu_lateral(frame, status, porcentagem_falhas_atual, resultados):
     espaco_entre_textos = 30
     cv2.putText(menu, f"Status: {status}", (10, margem_superior), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_status, 1)
     cv2.putText(menu, f"Falhas: {porcentagem_falhas_atual:.2f}%", (10, margem_superior + espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    cv2.putText(menu, "Minimo | media | Maximo | Sequencia", (10, margem_superior + 3*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    cv2.putText(menu, "Media | analises | Sequencia", (10, margem_superior + 3*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
     for resultado in resultados:
-        cor_resultado=(0, 255, 0) if float(resultado[1][:-1])<threshold_media_resultado else (0, 0, 255) # Verde se media é menor que threshold
+        cor_resultado = escolhe_cor_resultado(resultado)
         multiplicador = resultados.index(resultado)+4
-        cv2.putText(menu, f"{resultado[0]} | {resultado[1]} | {resultado[2]} | {resultado[3]}", (10, margem_superior + multiplicador*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_resultado, 1)
+        cv2.putText(menu, f"{resultado[1]} | {resultado[3]} | {resultado[4]}", (10, margem_superior + multiplicador*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_resultado, 1)
     return np.hstack((frame, menu))
 
 
 
 while True:
     ret, frame = cap.read()
-    # time.sleep(0.1)
+    time.sleep(0.05)
     if not ret:
         break
     roi, (rx, ry, rw, rh) = extrair_roi_corretamente(frame)  # Extrai posicao de interesse
@@ -129,7 +146,8 @@ while True:
         frames_processados = []
     else:
         status = "OCIOSO"
-    frame_com_menu = menu_lateral(frame, status, porcentagem_falhas_atual, resultados)
+    cor_resultado = ''
+    frame_com_menu = menu_lateral(frame, status, porcentagem_falhas_atual, resultados, cor_resultado)
     cv2.imshow('Frame', frame_com_menu)
     if cv2.waitKey(25) & 0xFF == ord('q'):
         break
