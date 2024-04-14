@@ -2,11 +2,14 @@ import cv2
 import numpy as np
 import time
 
-video_path = 'static/video_esteira3.mp4'
+video_path = 'static/video_esteira2_editado.mp4'
 cap = cv2.VideoCapture(video_path)
 pontos_roi = [(660, 10), (350, 10), (350, 475), (660, 475)]
+threshold_media_resultado = 11
+maior_area = 150000 # area maxima de contorno dinamico
+area_limite = 80000 # area minima de contorno dinamico
 frames_processados = []
-resultado = ''
+resultados = []
 
 def extrair_roi_corretamente(frame):
     pts = np.array(pontos_roi, dtype=np.int32)
@@ -16,18 +19,16 @@ def extrair_roi_corretamente(frame):
     masked = cv2.bitwise_and(frame, frame, mask=mask)
     x, y, w, h = cv2.boundingRect(pts)
     roi_cortada = masked[y:y+h, x:x+w]
-    return roi_cortada, (x, y, w, h)  # Return both the ROI and its bounding box
+    return roi_cortada, (x, y, w, h)
 
 def contornos(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    largest_area = 12000
     largest_rect = None
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area > largest_area:
-            largest_area = area
+        if area_limite < area < maior_area:
             x, y, w, h = cv2.boundingRect(contour)
             largest_rect = (x, y, w, h)
     if largest_rect is not None:
@@ -56,9 +57,8 @@ def analise_de_frames(frames_processados_final):
     avg = sum(frames_processados_final) / len(frames_processados_final)
     return f"{mini:.2f}%", f"{avg:.2f}%", f"{maxi:.2f}%"
 
-
-def menu_lateral(frame, status, porcentagem_falhas_atual, resultado):
-    cor_status=(255, 255, 255) if status=="OCIOSO" else (0, 255, 0)
+def menu_lateral(frame, status, porcentagem_falhas_atual, resultados):
+    cor_status=(255, 255, 255) if status=="OCIOSO" else (0, 255, 255)
     altura, largura = frame.shape[:2]
     largura_menu = 300
     cor_fundo = (50, 50, 50)
@@ -67,24 +67,24 @@ def menu_lateral(frame, status, porcentagem_falhas_atual, resultado):
     espaco_entre_textos = 30
     cv2.putText(menu, f"Status: {status}", (10, margem_superior), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_status, 1)
     cv2.putText(menu, f"Falhas: {porcentagem_falhas_atual:.2f}%", (10, margem_superior + espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    # cor_resultado=(255, 255, 255) if status=="OCIOSO" else (0, 255, 0)
-    cor_resultado=(255, 255, 255)
-    cv2.putText(menu, str(resultado), (10, margem_superior + 2*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_resultado, 1)
-    inicio_y = margem_superior + 3*espaco_entre_textos + 20
-    frame_com_menu = np.hstack((frame, menu))
-    return frame_com_menu
+    cv2.putText(menu, "Minimo | media | Maximo", (10, margem_superior + 3*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    for resultado in resultados:
+        cor_resultado=(0, 255, 0) if float(resultado[1][:-1])<threshold_media_resultado else (0, 0, 255) # Verde se media é menor que threshold
+        multiplicador = resultados.index(resultado)+4
+        cv2.putText(menu, f"{resultado[0]} | {resultado[1]} | {resultado[2]}", (10, margem_superior + multiplicador*espaco_entre_textos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_resultado, 1)
+    return np.hstack((frame, menu))
 
 
 
 while True:
     ret, frame = cap.read()
-    time.sleep(0.05)
+    # time.sleep(0.1)
     if not ret:
         break
-    roi, (rx, ry, rw, rh) = extrair_roi_corretamente(frame)  # Extract ROI and its position
-    success, largest_rect = contornos(roi)  # Find the largest contour in the ROI
+    roi, (rx, ry, rw, rh) = extrair_roi_corretamente(frame)  # Extrai posicao de interesse
+    success, largest_rect = contornos(roi)  # Encontra maior contorno dentro do ROI estabelecido
+    porcentagem_falhas_atual = 0
     if success:
-        resultado = 'Processando...'
         status = "EM ANALISE"
         x, y, w, h = largest_rect
         roi_contour = roi[y:y+h, x:x+w]
@@ -95,10 +95,13 @@ while True:
     elif len(frames_processados) > 0: # fechamento de frames analisados
         status = "FECHANDO..."
         resultado = analise_de_frames(frames_processados)
+        resultados.insert(0, resultado)
+        if len(resultados) > 5: # Mantem no maximo 5 registros
+            resultados.pop(5)
         frames_processados = []
     else:
         status = "OCIOSO"
-    frame_com_menu = menu_lateral(frame, status, porcentagem_falhas_atual, resultado)
+    frame_com_menu = menu_lateral(frame, status, porcentagem_falhas_atual, resultados)
     cv2.imshow('Frame', frame_com_menu)
     if cv2.waitKey(25) & 0xFF == ord('q'):
         break
