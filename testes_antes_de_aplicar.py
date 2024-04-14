@@ -2,14 +2,15 @@ import cv2
 import numpy as np
 import time
 
-video_path = 'static/video_esteira2_editado.mp4'
+# video_path = 'static/video_esteira2_editado.mp4'
+video_path = 'static/video_esteira3_editado.mp4'
 # video_path = 'static/video_esteira2.mp4'
 # video_path = 'static/video_esteira3.mp4'
 cap = cv2.VideoCapture(video_path)
-pontos_roi = [(660, 10), (350, 10), (350, 475), (660, 475)]
+pontos_roi = [(570, 10), (480, 10), (480, 475), (570, 475)]
 threshold_media_resultado = 11
-maior_area = 150000 # area maxima de contorno dinamico
-area_limite = 80000 # area minima de contorno dinamico
+maior_area = 50000 # area maxima de contorno dinamico
+area_limite = 26000 # area minima de contorno dinamico
 frames_processados = []
 resultados = []
 
@@ -53,7 +54,7 @@ def pontuacoes(processed_roi_contour):
     frames_processados.append(porcentagem_falhas_atual)
     return porcentagem_falhas_atual
 
-def find_high_deviant_sequences(data, num_std_dev=1.2):
+def find_high_deviant_sequences(data, num_std_dev):
     # funcao para identificar sequencias de porcentagem mais altas que a media
     # identifica pontos de anormalidade durante o scanner
     mean = sum(data) / len(data)
@@ -76,17 +77,17 @@ def find_subsequence_indexes(lista_geral, lista_anormalidade): # encontra sequen
     for i in range(len(lista_geral) - len(lista_anormalidade) + 1):
         if lista_geral[i:i+len(lista_anormalidade)] == lista_anormalidade:
             return i, i+len(lista_anormalidade)-1
-    return -1, -1
+    return 'OK'
 
 def analise_de_frames(frames_processados_final):
-    lista_pontuacao_anormal = find_high_deviant_sequences(frames_processados_final, num_std_dev=1.2)
+    lista_pontuacao_anormal = find_high_deviant_sequences(frames_processados_final, num_std_dev=1.1) # Threshold sensibilidade sequencia
     sequencia_anormal = 'OK'
     for pontuacao_anormal in lista_pontuacao_anormal:
         if pontuacao_anormal == frames_processados_final[:len(pontuacao_anormal)]:
             frames_processados_final = frames_processados_final[len(pontuacao_anormal):] # remove falso positivo começo
         elif pontuacao_anormal == frames_processados_final[-len(pontuacao_anormal):]:
             frames_processados_final = frames_processados_final[:len(frames_processados_final)-len(pontuacao_anormal)] # remove falso positivo final
-        if len(pontuacao_anormal) > 2: # pega sequencias de anormalidade
+        if len(pontuacao_anormal) > 2: # pega sequencias de anormalidade (Somente 1 por peça ainda)
             sequencia_anormal = find_subsequence_indexes(frames_processados_final, pontuacao_anormal)
     mini = min(frames_processados_final)
     maxi = max(frames_processados_final)
@@ -123,7 +124,7 @@ def menu_lateral(frame, status, porcentagem_falhas_atual, resultados, cor_result
 
 while True:
     ret, frame = cap.read()
-    time.sleep(0.05)
+    # time.sleep(0.1) # DEBUG
     if not ret:
         break
     roi, (rx, ry, rw, rh) = extrair_roi_corretamente(frame)  # Extrai posicao de interesse
