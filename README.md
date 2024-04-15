@@ -24,3 +24,8 @@ Framerate = 30fps -> Largura_ROI = 90p <br>
 Framerate = 25fps -> Largura_ROI = 110p <br>
 Framerate = 22fps -> Largura_ROI = 150p <br>
 Framerate = 19fps -> Largura_ROI = 190p <br>
+
+### Possiveis problemas
+
+> Pode acontecer instabilidades em gerar um ROI dinamico caso a largura do ROI for muito pequena, principalmente se acontecer muito ruído de uma vez na imagem, caso acontecer é interessante estudar
+> outra forma de estrutura de ROI Ex: (ROI estático -> ROI dinamico barra (atual) -> Novo ROI)
